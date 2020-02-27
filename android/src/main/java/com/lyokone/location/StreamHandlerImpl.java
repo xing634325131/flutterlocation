@@ -57,7 +57,6 @@ class StreamHandlerImpl implements StreamHandler {
 
     @Override
     public void onCancel(Object arguments) {
-        location.mFusedLocationClient.removeLocationUpdates(location.mLocationCallback);
         location.events = null;
     }
 

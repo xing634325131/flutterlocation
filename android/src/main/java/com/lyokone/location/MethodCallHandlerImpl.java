@@ -1,7 +1,6 @@
 package com.lyokone.location;
 
 import android.os.Build;
-import android.os.Bundle;
 import android.util.Log;
 import androidx.annotation.Nullable;
 import io.flutter.plugin.common.BinaryMessenger;
@@ -27,7 +26,8 @@ final class MethodCallHandlerImpl implements MethodCallHandler {
     public void onMethodCall(MethodCall call, Result result) {
         switch (call.method) {
         case "changeSettings":
-            onChangeSettings(call, result);
+            result.error("-1", "not support", "Method not support");
+            //onChangeSettings(call, result);
             break;
         case "getLocation":
             onGetLocation(result);
@@ -75,23 +75,6 @@ final class MethodCallHandlerImpl implements MethodCallHandler {
 
         channel.setMethodCallHandler(null);
         channel = null;
-    }
-
-    private void onChangeSettings(MethodCall call, Result result) {
-        try {
-            final Integer locationAccuracy = location.mapFlutterAccuracy.get(call.argument("accuracy"));
-            final Long updateIntervalMilliseconds = new Long((int) call.argument("interval"));
-            final Long fastestUpdateIntervalMilliseconds = updateIntervalMilliseconds / 2;
-            final Float distanceFilter = new Float((double) call.argument("distanceFilter"));
-
-            location.changeSettings(locationAccuracy, updateIntervalMilliseconds, fastestUpdateIntervalMilliseconds,
-                    distanceFilter);
-
-            result.success(1);
-        } catch (Exception e) {
-            result.error("CHANGE_SETTINGS_ERROR",
-                    "An unexcepted error happened during location settings change:" + e.getMessage(), null);
-        }
     }
 
     private void onGetLocation(Result result) {
