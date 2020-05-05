@@ -12,6 +12,7 @@ import android.location.LocationManager;
 import android.location.OnNmeaMessageListener;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.CountDownTimer;
 import android.provider.Settings;
 import android.util.Log;
 
@@ -28,6 +29,7 @@ import io.flutter.plugin.common.PluginRegistry;
 class FlutterLocation
         implements PluginRegistry.RequestPermissionsResultListener, PluginRegistry.ActivityResultListener {
     private static final String TAG = "FlutterLocation";
+    private static final boolean DEBUG = false;
 
     private final Context applicationContext;
 
@@ -60,6 +62,7 @@ class FlutterLocation
     private int locationPermissionState;
 
     private boolean waitingForPermission = false;
+    private boolean hasGetLocation = false;
     private LocationManager locationManager;
 
     private final static String PROVIDER = LocationManager.GPS_PROVIDER;
@@ -216,18 +219,15 @@ class FlutterLocation
         activity.startActivityForResult(intent, GPS_ENABLE_REQUEST);
     }
 
-    public void startRequestingLocation() {
+    public synchronized void startRequestingLocation() {
+        hasGetLocation = false;
         LocationListener listener = new LocationListener() {
-            private boolean returned = false;
 
             @Override
             public void onLocationChanged(Location location) {
-                if(location != null && !returned) {
-                    Map<String, Double> loc = generateResult(location);
-                    if(getLocationResult != null) {
-                        getLocationResult.success(loc);
-                    }
-                    returned = true;
+                Log.d(TAG, "onLocationChanged");
+                if(location != null && !hasGetLocation) {
+                    onGetLocation(location);
                     locationManager.removeUpdates(this);
                 }
             }
@@ -248,9 +248,52 @@ class FlutterLocation
             }
         };
 
-        locationManager.getLastKnownLocation(PROVIDER);
-        locationManager.requestLocationUpdates(PROVIDER, 1000, 5,
+        new CountDownTimer(5000, 5000){
+
+            @Override
+            public void onTick(long millisUntilFinished) {
+
+            }
+
+            @Override
+            public void onFinish() {
+                if(!hasGetLocation) {
+                    debug( "timeout for get location");
+                    debug( "try get cached gps location");
+
+                    Location gpsLocation = locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
+                    if(gpsLocation != null) {
+                        onGetLocation(gpsLocation);
+                    }  else {
+                        debug("cached gps location is null");
+                        debug("try get cached network location");
+
+                        Location networkLocation = locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
+                        if(networkLocation != null) {
+                            onGetLocation(networkLocation);
+                        }
+                    }
+                } else {
+                    debug("ignore. has get location");
+                }
+            }
+        }.start();
+
+
+
+        locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000, 5,
                 listener, activity.getMainLooper());
+        locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 1000, 5,
+                listener, activity.getMainLooper());
+    }
+
+    private void onGetLocation(Location location) {
+        debug("onGetLocation: " + location.toString());
+        Map<String, Double> loc = generateResult(location);
+        if(getLocationResult != null && !hasGetLocation) {
+            hasGetLocation = true;
+            getLocationResult.success(loc);
+        }
     }
 
     private Map<String, Double> generateResult(Location location) {
@@ -266,6 +309,12 @@ class FlutterLocation
         loc.put("heading", (double) location.getBearing());
         loc.put("time", (double) location.getTime());
         return loc;
+    }
+
+    private void debug(String message) {
+        if(DEBUG) {
+            Log.d(TAG,message);
+        }
     }
 
 }
